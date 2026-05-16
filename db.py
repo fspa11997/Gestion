@@ -1,280 +1,245 @@
-import os
-import psycopg2
-import psycopg2.extras
+import sqlite3
 import bcrypt
 from datetime import datetime
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-print("DATABASE_URL:", DATABASE_URL)
-def conectar():
-    if not DATABASE_URL or "postgres" not in DATABASE_URL:
-        raise Exception("DATABASE_URL inválida o no configurada")
+DB = "pedidos.db"
 
-    return psycopg2.connect(
-        DATABASE_URL,
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
+def conectar():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 
 def inicializar_db():
     conn = conectar()
     cursor = conn.cursor()
 
-    # =========================
-    # EMPRESAS
-    # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS empresas (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT UNIQUE
-        )
+    CREATE TABLE IF NOT EXISTS empresas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT UNIQUE
+    )
     """)
 
-    # =========================
-    # USUARIOS
-    # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id SERIAL PRIMARY KEY,
-            usuario TEXT UNIQUE,
-            password TEXT,
-            rol TEXT NOT NULL DEFAULT 'vendedor',
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT UNIQUE,
+        password TEXT,
+        rol TEXT NOT NULL DEFAULT 'vendedor',
+        empresa_id INTEGER
+    )
+    """)
+    
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS productos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        precio_mayorista REAL,
+        precio_individual REAL,
+        precio_mostrador REAL,
+        costo REAL,
+        empresa_id INTEGER,
+        activo INTEGER DEFAULT 1
+    )
     """)
 
-    # =========================
-    # PRODUCTOS
-    # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS productos (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT,
-            precio_mayorista DOUBLE PRECISION,
-            precio_individual DOUBLE PRECISION,
-            precio_mostrador DOUBLE PRECISION,
-            costo DOUBLE PRECISION,
-            empresa_id INTEGER,
-            activo BOOLEAN DEFAULT TRUE
-        )
-    """)
+    CREATE TABLE IF NOT EXISTS pedidos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente TEXT,
+        producto TEXT,
+        direccion TEXT,
+        ciudad TEXT,
+        telefono TEXT,
+        domiciliario TEXT,
+        cantidad INTEGER,
+        peso REAL,
 
-    # =========================
-    # PEDIDOS
-    # =========================
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pedidos (
-            id SERIAL PRIMARY KEY,
-            cliente TEXT,
-            producto TEXT,
-            direccion TEXT,
-            ciudad TEXT,
-            telefono TEXT,
-            domiciliario TEXT,
-            cantidad INTEGER,
-            peso DOUBLE PRECISION,
-            precio DOUBLE PRECISION DEFAULT 0,
-            abono DOUBLE PRECISION DEFAULT 0,
-            tipo_precio TEXT,
-            estado TEXT DEFAULT 'pendiente',
-            eliminado INTEGER DEFAULT 0,
-            fecha TIMESTAMP DEFAULT NOW(),
-            fecha_entrega TIMESTAMP,
-            empresa_id INTEGER
-        )
-    """)
+        precio REAL DEFAULT 0,
+        abono REAL DEFAULT 0,
 
-    # =========================
+        tipo_precio TEXT,
+
+        estado TEXT DEFAULT 'pendiente',
+        eliminado INTEGER DEFAULT 0,
+
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        fecha_entrega TIMESTAMP,
+
+        empresa_id INTEGER
+    );
+    """)
+    
+        # =========================
     # FACTURAS
     # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS facturas (
-            id SERIAL PRIMARY KEY,
-            cliente TEXT,
-            direccion TEXT,
-            ciudad TEXT,
-            telefono TEXT,
-            fecha TIMESTAMP,
-            total DOUBLE PRECISION,
-            abono DOUBLE PRECISION DEFAULT 0,
-            estado TEXT,
-            tipo_venta TEXT,
-            plazo_pago TEXT,
-            domiciliario TEXT,
-            tipo_precio TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS facturas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente TEXT,
+        direccion TEXT,
+        ciudad TEXT,
+        telefono TEXT,
+        fecha TEXT,
+        total REAL,
+        abono REAL DEFAULT 0,
+        estado TEXT,
+        tipo_venta TEXT,
+        plazo_pago TEXT,
+
+        domiciliario TEXT,
+        tipo_precio TEXT,
+
+        empresa_id INTEGER
+    )
     """)
 
     # =========================
     # DETALLE FACTURA
     # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS detalle_factura (
-            id SERIAL PRIMARY KEY,
-            factura_id INTEGER,
-            producto TEXT,
-            cantidad INTEGER,
-            peso DOUBLE PRECISION,
-            precio_unitario DOUBLE PRECISION,
-            subtotal DOUBLE PRECISION,
-            tipo_precio TEXT
-        )
+    CREATE TABLE IF NOT EXISTS detalle_factura (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        factura_id INTEGER,
+        producto TEXT,
+        cantidad INTEGER,
+        peso REAL,
+        precio_unitario REAL,
+        subtotal REAL,
+        tipo_precio TEXT
+    )
     """)
 
     # =========================
     # INVENTARIO
     # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS inventario (
-            id SERIAL PRIMARY KEY,
-            producto TEXT,
-            stock_unidades INTEGER DEFAULT 0,
-            stock_kilos DOUBLE PRECISION DEFAULT 0,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS inventario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto TEXT,
+        stock_unidades INTEGER DEFAULT 0,
+        stock_kilos REAL DEFAULT 0,
+        empresa_id INTEGER
+    )
     """)
 
     # =========================
     # MOVIMIENTOS INVENTARIO
     # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS movimientos_inventario (
-            id SERIAL PRIMARY KEY,
-            producto TEXT,
-            tipo TEXT,
-            cantidad INTEGER,
-            peso DOUBLE PRECISION,
-            fecha TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS movimientos_inventario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto TEXT,
+        tipo TEXT,
+        cantidad INTEGER,
+        peso REAL,
+        fecha TEXT,
+        empresa_id INTEGER
+    )
     """)
 
     # =========================
     # MENSAJEROS
     # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS mensajeros (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT,
-            telefono TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS mensajeros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        telefono TEXT,
+        empresa_id INTEGER
+    )
     """)
-
-    # =========================
-    # CLIENTES
-    # =========================
+    
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS clientes (
-            id SERIAL PRIMARY KEY,
-            nombre TEXT,
-            direccion TEXT,
-            ciudad TEXT,
-            telefono TEXT,
-            tipo_id TEXT,
-            identificacion TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        direccion TEXT,
+        ciudad TEXT,
+        telefono TEXT,
+        tipo_id TEXT,
+        identificacion TEXT,
+        empresa_id INTEGER
+    )
     """)
-
-    # =========================
-    # CREDITOS
-    # =========================
+    
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS creditos (
-            id SERIAL PRIMARY KEY,
-            cliente TEXT,
-            factura_id INTEGER,
-            total DOUBLE PRECISION,
-            abonado DOUBLE PRECISION DEFAULT 0,
-            saldo DOUBLE PRECISION,
-            estado TEXT,
-            plazo_pago TEXT,
-            fecha TIMESTAMP,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS creditos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente TEXT,
+        factura_id INTEGER,
+        total REAL,
+        abonado REAL DEFAULT 0,
+        saldo REAL,
+        estado TEXT,
+        plazo_pago TEXT,
+        fecha TEXT,
+        empresa_id INTEGER
+    )
     """)
-
-    # =========================
-    # PAGOS CREDITO
-    # =========================
+    
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pagos_credito (
-            id SERIAL PRIMARY KEY,
-            factura_id INTEGER,
-            cliente TEXT,
-            abono DOUBLE PRECISION,
-            fecha TEXT,
-            observacion TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS pagos_credito (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        factura_id INTEGER,
+        cliente TEXT,
+        abono REAL,
+        fecha TEXT,
+        observacion TEXT,
+        empresa_id INTEGER
+    );
     """)
 
-    # =========================
-    # RECIBOS ABONO
-    # =========================
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recibos_abono (
-            id SERIAL PRIMARY KEY,
-            factura_id INTEGER,
-            cliente TEXT,
-            valor_abono DOUBLE PRECISION,
-            saldo_anterior DOUBLE PRECISION,
-            saldo_nuevo DOUBLE PRECISION,
-            fecha TEXT,
-            empresa_id INTEGER
-        )
+    CREATE TABLE IF NOT EXISTS recibos_abono (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        factura_id INTEGER,
+        cliente TEXT,
+        valor_abono REAL,
+        saldo_anterior REAL,
+        saldo_nuevo REAL,
+        fecha TEXT,
+        empresa_id INTEGER
+    )
     """)
-
-    # =========================
-    # DATOS INICIALES
-    # =========================
-    cursor.execute("SELECT COUNT(*) FROM empresas")
-    count = cursor.fetchone()["count"]
-
-    if count == 0:
-        cursor.execute("INSERT INTO empresas (nombre) VALUES (%s)", ("Mi Empresa",))
-        cursor.execute("INSERT INTO empresas (nombre) VALUES (%s)", ("Empresa Demo",))
+    
+    cursor.execute("SELECT COUNT(*) FROM empresas") 
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO empresas (nombre) VALUES ('Mi Empresa')")
+        cursor.execute("INSERT INTO empresas (nombre) VALUES ('Empresa Demo')")
         print("🔥 DB inicializada")
 
+    # 🔥 ESTO FALTABA
     conn.commit()
     conn.close()
 
 
 
-import bcrypt
-
 def crear_usuario(usuario, password, rol, empresa_id):
+    import bcrypt
+
     conn = conectar()
     cursor = conn.cursor()
 
-    # =========================
-    # VERIFICAR SI EXISTE
-    # =========================
+    # verificar si existe
     cursor.execute("""
-        SELECT id
-        FROM usuarios
-        WHERE usuario = %s AND empresa_id = %s
+        SELECT id FROM usuarios WHERE usuario = ? AND empresa_id = ?
     """, (usuario, empresa_id))
 
     if cursor.fetchone():
-        conn.close()
-        return False
+        return False  # ya existe
 
-    # =========================
-    # HASH PASSWORD
-    # =========================
+    # hash password
     hash_password = bcrypt.hashpw(
-        password.encode("utf-8"),
+        password.encode('utf-8'),
         bcrypt.gensalt()
-    ).decode("utf-8")  # importante en Postgres
+    )
 
-    # =========================
-    # INSERT USUARIO
-    # =========================
     cursor.execute("""
         INSERT INTO usuarios (usuario, password, rol, empresa_id)
-        VALUES (%s, %s, %s, %s)
+        VALUES (?, ?, ?, ?)
     """, (usuario, hash_password, rol, empresa_id))
 
     conn.commit()
@@ -282,12 +247,6 @@ def crear_usuario(usuario, password, rol, empresa_id):
 
     return True
     
-
-
-
-# =========================
-# VALIDAR USUARIO
-# =========================
 def validar_usuario(usuario, password, empresa_id):
     conn = conectar()
     cursor = conn.cursor()
@@ -295,7 +254,7 @@ def validar_usuario(usuario, password, empresa_id):
     cursor.execute("""
         SELECT id, usuario, password, rol, empresa_id
         FROM usuarios
-        WHERE usuario = %s AND empresa_id = %s
+        WHERE usuario=? AND empresa_id=?
     """, (usuario, empresa_id))
 
     user = cursor.fetchone()
@@ -307,17 +266,13 @@ def validar_usuario(usuario, password, empresa_id):
     password_bd = user["password"]
 
     if isinstance(password_bd, str):
-        password_bd = password_bd.encode("utf-8")
+        password_bd = password_bd.encode('utf-8')
 
-    if bcrypt.checkpw(password.encode("utf-8"), password_bd):
+    if bcrypt.checkpw(password.encode('utf-8'), password_bd):
         return user
 
     return None
 
-
-# =========================
-# CREAR CLIENTE
-# =========================
 def crear_cliente(nombre, direccion, ciudad, telefono,
                   tipo_id, identificacion, empresa_id):
 
@@ -334,7 +289,7 @@ def crear_cliente(nombre, direccion, ciudad, telefono,
             identificacion,
             empresa_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         nombre,
         direccion,
@@ -348,10 +303,6 @@ def crear_cliente(nombre, direccion, ciudad, telefono,
     conn.commit()
     conn.close()
 
-
-# =========================
-# OBTENER CLIENTES
-# =========================
 def obtener_clientes(empresa_id):
 
     conn = conectar()
@@ -360,52 +311,41 @@ def obtener_clientes(empresa_id):
     cursor.execute("""
         SELECT *
         FROM clientes
-        WHERE empresa_id = %s
+        WHERE empresa_id = ?
         ORDER BY nombre ASC
     """, (empresa_id,))
 
     data = cursor.fetchall()
 
     conn.close()
+
     return data
 
-
-# =========================
-# OBTENER EMPRESAS
-# =========================
 def obtener_empresas():
-
     conn = conectar()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id, nombre
-        FROM empresas
-    """)
-
+    cursor.execute("SELECT id, nombre FROM empresas")
     data = cursor.fetchall()
 
     conn.close()
     return data
 
-
-# =========================
-# OBTENER PRODUCTOS
-# =========================
 def obtener_productos(empresa_id):
+    
 
-    conn = conectar()
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM productos
-        WHERE empresa_id = %s
-        AND activo = TRUE
+        WHERE empresa_id = ?
+        AND activo=1           
     """, (empresa_id,))
 
     productos = cursor.fetchall()
-
     conn.close()
     return productos
 
@@ -416,10 +356,10 @@ def obtener_precio_producto(nombre, empresa_id, tipo_precio):
 
     cursor.execute("""
         SELECT precio_mayorista,
-            precio_individual,
-            precio_mostrador
+               precio_individual,
+               precio_mostrador
         FROM productos
-        WHERE nombre=%s AND empresa_id=%s
+        WHERE nombre=? AND empresa_id=?
     """, (nombre, empresa_id))
 
     p = cursor.fetchone()
@@ -549,18 +489,13 @@ def obtener_pedidos_entregados(empresa_id):
     return data
 
 
-# =========================
-# PEDIDOS ELIMINADOS
-# =========================
 def obtener_pedidos_eliminados(empresa_id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT *
-        FROM pedidos
-        WHERE empresa_id = %s
+        SELECT * FROM pedidos
+        WHERE empresa_id = ?
         AND eliminado = 1
         ORDER BY id DESC
     """, (empresa_id,))
@@ -569,14 +504,11 @@ def obtener_pedidos_eliminados(empresa_id):
     conn.close()
     return data
 
-
-# =========================
-# CAMBIAR ESTADO
-# =========================
 def cambiar_estado(id, estado):
-
     conn = conectar()
     cursor = conn.cursor()
+
+    from datetime import datetime
 
     if estado == "entregado":
         fecha_entrega = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -585,108 +517,82 @@ def cambiar_estado(id, estado):
 
     cursor.execute("""
         UPDATE pedidos
-        SET estado = %s,
-            fecha_entrega = %s
-        WHERE id = %s
+        SET estado=?, fecha_entrega=?
+        WHERE id=?
     """, (estado, fecha_entrega, id))
 
     conn.commit()
     conn.close()
 
 
-# =========================
-# ELIMINAR PEDIDO (SOFT DELETE)
-# =========================
 def eliminar_pedido(id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         UPDATE pedidos
-        SET eliminado = 1
-        WHERE id = %s
+        SET eliminado=1
+        WHERE id=?
     """, (id,))
 
     conn.commit()
     conn.close()
 
-
-# =========================
-# RECUPERAR PEDIDO
-# =========================
 def recuperar_pedido(id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
         UPDATE pedidos
-        SET eliminado = 0
-        WHERE id = %s
+        SET eliminado=0
+        WHERE id=?
     """, (id,))
 
     conn.commit()
     conn.close()
 
-
-# =========================
-# VENTAS DEL DÍA
-# =========================
 def total_ventas_dia(empresa_id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT COALESCE(SUM(precio), 0) AS total
+        SELECT SUM(precio) as total
         FROM pedidos
-        WHERE DATE(fecha) = CURRENT_DATE
-        AND empresa_id = %s
+        WHERE DATE(fecha) = DATE('now')
+        AND empresa_id = ?
         AND eliminado = 0
     """, (empresa_id,))
 
     total = cursor.fetchone()["total"]
     conn.close()
 
-    return total
+    return total or 0
 
-
-# =========================
-# VENTAS DEL MES
-# =========================
 def total_ventas_mes(empresa_id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT COALESCE(SUM(precio), 0) AS total
+        SELECT SUM(precio) as total
         FROM pedidos
-        WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
-        AND empresa_id = %s
+        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
+        AND empresa_id = ?
         AND eliminado = 0
     """, (empresa_id,))
 
     total = cursor.fetchone()["total"]
     conn.close()
 
-    return total
-
-
-# =========================
-# PRODUCTO TOP DEL MES
-# =========================
+    return total or 0
 def producto_top_mes(empresa_id):
-
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT producto, SUM(cantidad) AS total
+        SELECT producto, SUM(cantidad) as total
         FROM pedidos
-        WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
-        AND empresa_id = %s
+        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
+        AND empresa_id = ?
         AND eliminado = 0
         GROUP BY producto
         ORDER BY total DESC
@@ -697,8 +603,6 @@ def producto_top_mes(empresa_id):
     conn.close()
 
     return data
-
-
 
 def crear_factura(
     cliente,
@@ -714,7 +618,11 @@ def crear_factura(
     domiciliario=""
 ):
 
-    conn = conectar()
+    import sqlite3
+    from datetime import datetime
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -725,57 +633,44 @@ def crear_factura(
     # NORMALIZAR ABONO
     # =========================
     try:
-        abono = float(abono or 0)
+        abono = float(abono)
     except:
         abono = 0
 
     # =========================
-    # CALCULAR TOTAL (CORREGIDO)
+    # CALCULAR TOTAL FACTURA
     # =========================
     for p in productos:
 
-        producto = p.get("producto")
-
-        # 🔥 precio SIEMPRE desde backend
-        tipo_precio_item = p.get("tipo_precio") or tipo_precio
-
-        precio = float(
-            obtener_precio_producto(
-                producto,
-                empresa_id,
-                tipo_precio_item
-            ) or 0
-        )
-
+        precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
-        cantidad = int(p.get("cantidad") or 0)
 
         subtotal = precio * peso
         total += subtotal
 
-    # =========================
-    # CONTROL DE ABONO Y SALDO
-    # =========================
-    abono = min(abono, total)
     saldo = total - abono
+    if saldo < 0:
+        saldo = 0
 
     # =========================
     # ESTADO
     # =========================
     if tipo_venta == "credito":
+
         if abono <= 0:
             estado = "pendiente"
         elif saldo == 0:
             estado = "pagado"
         else:
             estado = "parcial"
+
     else:
         estado = "pagado"
         abono = total
         saldo = 0
 
     # =========================
-    # INSERT FACTURA (POSTGRES)
+    # INSERT FACTURA
     # =========================
     cursor.execute("""
         INSERT INTO facturas (
@@ -793,8 +688,7 @@ def crear_factura(
             domiciliario,
             empresa_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         cliente,
         direccion,
@@ -811,17 +705,13 @@ def crear_factura(
         empresa_id
     ))
 
-    factura_id = cursor.fetchone()[0]
-
-    conn.commit()
-    conn.close()
-
-    return factura_id
+    factura_id = cursor.lastrowid
 
     # =========================
     # DETALLE FACTURA
     # =========================
     for p in productos:
+
         precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
         cantidad = int(p.get("cantidad") or 0)
@@ -837,7 +727,7 @@ def crear_factura(
                 precio_unitario,
                 subtotal
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             factura_id,
             p.get("producto"),
@@ -864,7 +754,7 @@ def crear_factura(
                 fecha,
                 empresa_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cliente,
             factura_id,
@@ -883,13 +773,16 @@ def crear_factura(
     return factura_id
 
 def obtener_factura(factura_id, empresa_id):
-    conn = conectar()
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM facturas
-        WHERE id = %s AND empresa_id = %s
+        WHERE id = ? AND empresa_id = ?
     """, (factura_id, empresa_id))
 
     factura = cursor.fetchone()
@@ -897,15 +790,17 @@ def obtener_factura(factura_id, empresa_id):
     conn.close()
     return factura
 
-
 def obtener_detalles_factura(factura_id):
-    conn = conectar()
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM detalle_factura
-        WHERE factura_id = %s
+        WHERE factura_id = ?
     """, (factura_id,))
 
     detalles = cursor.fetchall()
@@ -913,8 +808,9 @@ def obtener_detalles_factura(factura_id):
     conn.close()
     return detalles
 
-
 def registrar_compra(producto, cantidad, peso, empresa_id):
+    from datetime import datetime
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -923,7 +819,7 @@ def registrar_compra(producto, cantidad, peso, empresa_id):
     # 🔍 verificar si existe
     cursor.execute("""
         SELECT id FROM inventario
-        WHERE producto = %s AND empresa_id = %s
+        WHERE producto = ? AND empresa_id = ?
     """, (producto, empresa_id))
 
     existe = cursor.fetchone()
@@ -931,20 +827,18 @@ def registrar_compra(producto, cantidad, peso, empresa_id):
     if existe:
         cursor.execute("""
             UPDATE inventario
-            SET stock_unidades = stock_unidades + %s,
-                stock_kilos = stock_kilos + %s
-            WHERE producto = %s AND empresa_id = %s
+            SET stock_unidades = stock_unidades + ?,
+                stock_kilos = stock_kilos + ?
+            WHERE producto = ? AND empresa_id = ?
         """, (cantidad, peso, producto, empresa_id))
-
     else:
         cursor.execute("""
             INSERT INTO inventario (producto, stock_unidades, stock_kilos, empresa_id)
-            VALUES (%s, %s, %s, %s)
+            VALUES (?, ?, ?, ?)
         """, (producto, cantidad, peso, empresa_id))
 
     conn.commit()
     conn.close()
-
 
 def obtener_inventario(empresa_id):
     conn = conectar()
@@ -953,23 +847,24 @@ def obtener_inventario(empresa_id):
     cursor.execute("""
         SELECT producto, stock_unidades, stock_kilos
         FROM inventario
-        WHERE empresa_id = %s
+        WHERE empresa_id = ?
     """, (empresa_id,))
 
     data = cursor.fetchall()
-
     conn.close()
     return data
 
-
 def obtener_facturas(empresa_id):
-    conn = conectar()
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM facturas
-        WHERE empresa_id = %s
+        WHERE empresa_id = ?
         ORDER BY id DESC
     """, (empresa_id,))
 
@@ -979,18 +874,18 @@ def obtener_facturas(empresa_id):
     return data
 
 def crear_factura_empresa(empresa_id):
-    conn = conectar()
+    from datetime import datetime
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
     cursor = conn.cursor()
 
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # 🔥 obtener pedidos pendientes
     cursor.execute("""
-        SELECT *
-        FROM pedidos
-        WHERE empresa_id = %s
-        AND estado = 'pendiente'
-        AND eliminado = 0
+        SELECT * FROM pedidos
+        WHERE empresa_id = ? AND estado = 'pendiente' AND eliminado = 0
     """, (empresa_id,))
 
     pedidos = cursor.fetchall()
@@ -1004,32 +899,22 @@ def crear_factura_empresa(empresa_id):
     # 🔥 crear factura
     cursor.execute("""
         INSERT INTO facturas (cliente, fecha, total, empresa_id)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-    """, ("FACTURA EMPRESA", fecha, 0, empresa_id))
+        VALUES (?, ?, 0, ?)
+    """, ("FACTURA EMPRESA", fecha, empresa_id))
 
-    factura_id = cursor.fetchone()[0]
+    factura_id = cursor.lastrowid
 
     for p in pedidos:
 
-        precio_unitario = obtener_precio_producto(
-            p["producto"],
-            empresa_id
-        )
+        precio_unitario = obtener_precio_producto(p["producto"], empresa_id)
 
         subtotal = precio_unitario * p["peso"]
+
         total += subtotal
 
         cursor.execute("""
-            INSERT INTO detalle_factura (
-                factura_id,
-                producto,
-                cantidad,
-                peso,
-                precio_unitario,
-                subtotal
-            )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO detalle_factura (factura_id, producto, cantidad, peso, precio_unitario, subtotal)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             factura_id,
             p["producto"],
@@ -1043,43 +928,103 @@ def crear_factura_empresa(empresa_id):
         cursor.execute("""
             UPDATE pedidos
             SET estado = 'entregado'
-            WHERE id = %s
+            WHERE id = ?
         """, (p["id"],))
 
-    cursor.execute("""
-        UPDATE facturas
-        SET total = %s
-        WHERE id = %s
-    """, (total, factura_id))
+    cursor.execute("UPDATE facturas SET total=? WHERE id=?", (total, factura_id))
 
     conn.commit()
     conn.close()
 
     return factura_id
 
+def crear_pedido_desde_factura(
+    factura_id,
+    cliente,
+    producto,
+    direccion,
+    ciudad,
+    telefono,
+    domiciliario,
+    cantidad,
+    peso,
+    empresa_id,
+    tipo_precio
+):
+
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
+    cursor = conn.cursor()
+
+    # 🔥 obtener precio correcto
+    precio_unitario = obtener_precio_producto(
+        producto,
+        empresa_id,
+        tipo_precio
+    )
+
+    # 🔥 calcular total correcto
+    total = precio_unitario * (peso if peso > 0 else cantidad)
+
+    cursor.execute("""
+        INSERT INTO pedidos (
+            factura_id,
+            cliente,
+            producto,
+            direccion,
+            ciudad,
+            telefono,
+            domiciliario,
+            cantidad,
+            peso,
+            precio,
+            empresa_id,
+            estado,
+            eliminado
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 0)
+    """, (
+        factura_id,
+        cliente,
+        producto,
+        direccion,
+        ciudad,
+        telefono,
+        domiciliario,
+        cantidad,
+        peso,
+        total,
+        empresa_id
+    ))
+
+    conn.commit()
+    conn.close()
+
 def descontar_inventario(producto, cantidad, peso, empresa_id):
+
     conn = conectar()
     cursor = conn.cursor()
 
     # 🔥 restar unidades
     cursor.execute("""
         UPDATE inventario
-        SET stock_unidades = stock_unidades - %s
-        WHERE producto = %s AND empresa_id = %s
+        SET stock_unidades = stock_unidades - ?
+        WHERE producto = ? AND empresa_id = ?
     """, (cantidad, producto, empresa_id))
 
     # 🔥 restar kilos
     cursor.execute("""
         UPDATE inventario
-        SET stock_kilos = stock_kilos - %s
-        WHERE producto = %s AND empresa_id = %s
+        SET stock_kilos = stock_kilos - ?
+        WHERE producto = ? AND empresa_id = ?
     """, (peso, producto, empresa_id))
 
     conn.commit()
     conn.close()
 
-
 def crear_credito(cliente, factura_id, total, empresa_id):
+
     conn = conectar()
     cursor = conn.cursor()
 
@@ -1090,18 +1035,16 @@ def crear_credito(cliente, factura_id, total, empresa_id):
             cliente,
             factura_id,
             total,
-            abonado,
             saldo,
             fecha,
             empresa_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?)
     """, (
         cliente,
         factura_id,
         total,
-        0,      # abonado inicia en 0 (IMPORTANTE)
-        total,  # saldo inicial
+        total,
         fecha,
         empresa_id
     ))
@@ -1109,22 +1052,16 @@ def crear_credito(cliente, factura_id, total, empresa_id):
     conn.commit()
     conn.close()
 
-
 def abonar_credito(credito_id, valor):
+
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT saldo, abonado
-        FROM creditos
-        WHERE id = %s
+        SELECT saldo, abonado FROM creditos WHERE id=?
     """, (credito_id,))
 
     c = cursor.fetchone()
-
-    if not c:
-        conn.close()
-        return
 
     nuevo_abono = c["abonado"] + valor
     nuevo_saldo = c["saldo"] - valor
@@ -1133,10 +1070,8 @@ def abonar_credito(credito_id, valor):
 
     cursor.execute("""
         UPDATE creditos
-        SET abonado = %s,
-            saldo = %s,
-            estado = %s
-        WHERE id = %s
+        SET abonado=?, saldo=?, estado=?
+        WHERE id=?
     """, (
         nuevo_abono,
         nuevo_saldo,
@@ -1147,15 +1082,14 @@ def abonar_credito(credito_id, valor):
     conn.commit()
     conn.close()
 
-
 def obtener_creditos(empresa_id):
+
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT *
-        FROM creditos
-        WHERE empresa_id = %s
+        SELECT * FROM creditos
+        WHERE empresa_id=?
         ORDER BY id DESC
     """, (empresa_id,))
 
@@ -1166,7 +1100,11 @@ def obtener_creditos(empresa_id):
 
 def registrar_abono(factura_id, abono, observacion, empresa_id):
 
-    conn = conectar()
+    import sqlite3
+    from datetime import datetime
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     # =========================
@@ -1175,8 +1113,8 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     cursor.execute("""
         SELECT *
         FROM facturas
-        WHERE id = %s
-        AND empresa_id = %s
+        WHERE id=?
+        AND empresa_id=?
     """, (factura_id, empresa_id))
 
     factura = cursor.fetchone()
@@ -1188,6 +1126,7 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     nuevo_abono = (factura["abono"] or 0) + abono
 
     saldo = factura["total"] - nuevo_abono
+
     saldo_anterior = factura["total"] - (factura["abono"] or 0)
 
     # =========================
@@ -1208,9 +1147,9 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     # =========================
     cursor.execute("""
         UPDATE facturas
-        SET abono = %s,
-            estado = %s
-        WHERE id = %s
+        SET abono=?,
+            estado=?
+        WHERE id=?
     """, (
         nuevo_abono,
         estado,
@@ -1222,10 +1161,10 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     # =========================
     cursor.execute("""
         UPDATE creditos
-        SET abonado = %s,
-            saldo = %s,
-            estado = %s
-        WHERE factura_id = %s
+        SET abonado=?,
+            saldo=?,
+            estado=?
+        WHERE factura_id=?
     """, (
         nuevo_abono,
         saldo,
@@ -1247,7 +1186,7 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
             observacion,
             empresa_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?)
     """, (
         factura_id,
         factura["cliente"],
@@ -1270,7 +1209,7 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
             fecha,
             empresa_id
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         factura_id,
         factura["cliente"],
@@ -1290,23 +1229,25 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
 
 def obtener_historial_abonos(factura_id, empresa_id):
 
-    conn = conectar()
+    import sqlite3
+
+    conn = sqlite3.connect("pedidos.db")
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM pagos_credito
-        WHERE factura_id = %s
-        AND empresa_id = %s
+        WHERE factura_id=?
+        AND empresa_id=?
         ORDER BY id DESC
-    """, (factura_id, empresa_id))
+    """, (
+        factura_id,
+        empresa_id
+    ))
 
     pagos = cursor.fetchall()
 
     conn.close()
-    return pagos    
 
-#guadar cambios railway y git
-#git add .
-#git commit -m "fix: migrate fully to postgres"
-#git push origin main
+    return pagos
