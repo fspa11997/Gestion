@@ -36,7 +36,10 @@ from db import (
 
 from db import inicializar_db
 
+from db import inicializar_db
+
 inicializar_db()
+print("🔥 DB inicializada")
 
 app = Flask(__name__)
 app.secret_key = "secreto"
