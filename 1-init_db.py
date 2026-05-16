@@ -1,13 +1,13 @@
 from db import inicializar_db
 import sqlite3
 import bcrypt
-import os
+
 
 # =========================
 # RESET (solo desarrollo)
 # =========================
-if os.path.exists("pedidos.db"):
-    os.remove("pedidos.db")
+
+   
 
 # =========================
 # DB
