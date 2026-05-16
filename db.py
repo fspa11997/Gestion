@@ -7,11 +7,13 @@ from datetime import datetime
 DATABASE_URL = os.environ.get("DATABASE_URL")
 print("DATABASE_URL:", DATABASE_URL)
 def conectar():
-    conn = psycopg2.connect(
+    if not DATABASE_URL or "postgres" not in DATABASE_URL:
+        raise Exception("DATABASE_URL inválida o no configurada")
+
+    return psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.RealDictCursor
     )
-    return conn
 
 def inicializar_db():
     conn = conectar()
@@ -1303,3 +1305,8 @@ def obtener_historial_abonos(factura_id, empresa_id):
 
     conn.close()
     return pagos    
+
+#guadar cambios railway y git
+#git add .
+#git commit -m "fix: migrate fully to postgres"
+#git push origin main
