@@ -1,4 +1,5 @@
 import sqlite3
+from db import inicializar_db
 import pytz
 import os
 from datetime import datetime
@@ -33,9 +34,12 @@ from db import (
 )
 
 
+
+
+
+inicializar_db()
 app = Flask(__name__)
 app.secret_key = "secreto"
-
 
 zona_colombia = pytz.timezone("America/Bogota")
 fecha_entrega = datetime.now(zona_colombia)
