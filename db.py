@@ -1,4 +1,5 @@
 import sqlite3
+import pytz
 import bcrypt
 from datetime import datetime
 from datetime import datetime, timezone, timedelta
@@ -815,8 +816,8 @@ def registrar_compra(producto, cantidad, peso, empresa_id):
 
     conn = conectar()
     cursor = conn.cursor()
-
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    colombia = pytz.timezone("America/Bogota")
+    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
 
     # 🔍 verificar si existe
     cursor.execute("""
@@ -881,8 +882,8 @@ def crear_factura_empresa(empresa_id):
 
     conn = sqlite3.connect("pedidos.db")
     cursor = conn.cursor()
-
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    colombia = pytz.timezone("America/Bogota")
+    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
 
     # 🔥 obtener pedidos pendientes
     cursor.execute("""
@@ -1030,7 +1031,8 @@ def crear_credito(cliente, factura_id, total, empresa_id):
     conn = conectar()
     cursor = conn.cursor()
 
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    colombia = pytz.timezone("America/Bogota")
+    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute("""
         INSERT INTO creditos (
@@ -1177,7 +1179,8 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     # =========================
     # HISTORIAL
     # =========================
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    colombia = pytz.timezone("America/Bogota")
+    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute("""
         INSERT INTO pagos_credito (
