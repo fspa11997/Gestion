@@ -1,5 +1,4 @@
 import sqlite3
-from db import inicializar_db
 import pytz
 import os
 from datetime import datetime
@@ -35,9 +34,10 @@ from db import (
 
 
 
-
+from db import inicializar_db
 
 inicializar_db()
+
 app = Flask(__name__)
 app.secret_key = "secreto"
 
