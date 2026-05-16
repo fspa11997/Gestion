@@ -1,6 +1,7 @@
 import sqlite3
 import bcrypt
 from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 DB = "pedidos.db"
 
@@ -630,7 +631,7 @@ def crear_factura(
     # FECHA CORRECTA (COLOMBIA)
     # =========================
     colombia = pytz.timezone("America/Bogota")
-    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
+    fecha = (datetime.now(timezone.utc) - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
 
     total = 0
 
