@@ -620,12 +620,17 @@ def crear_factura(
 
     import sqlite3
     from datetime import datetime
+    import pytz
 
     conn = sqlite3.connect("pedidos.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # =========================
+    # FECHA CORRECTA (COLOMBIA)
+    # =========================
+    colombia = pytz.timezone("America/Bogota")
+    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
 
     total = 0
 
@@ -641,7 +646,6 @@ def crear_factura(
     # CALCULAR TOTAL FACTURA
     # =========================
     for p in productos:
-
         precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
 
@@ -656,14 +660,12 @@ def crear_factura(
     # ESTADO
     # =========================
     if tipo_venta == "credito":
-
         if abono <= 0:
             estado = "pendiente"
         elif saldo == 0:
             estado = "pagado"
         else:
             estado = "parcial"
-
     else:
         estado = "pagado"
         abono = total
@@ -711,7 +713,6 @@ def crear_factura(
     # DETALLE FACTURA
     # =========================
     for p in productos:
-
         precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
         cantidad = int(p.get("cantidad") or 0)
