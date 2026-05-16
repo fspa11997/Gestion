@@ -5,7 +5,7 @@ import bcrypt
 from datetime import datetime
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
+print("DATABASE_URL:", DATABASE_URL)
 def conectar():
     conn = psycopg2.connect(
         DATABASE_URL,
