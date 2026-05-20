@@ -59,10 +59,6 @@
             margin: 12px 0;
         }
 
-        /* =========================
-        TABLA
-        ========================= */
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -89,10 +85,6 @@
             background: #f7faff;
         }
 
-        /* =========================
-        BADGES
-        ========================= */
-
         .badge {
             padding: 4px 10px;
             border-radius: 20px;
@@ -116,20 +108,12 @@
             color: #b45309;
         }
 
-        /* =========================
-        TOTALES
-        ========================= */
-
         .total {
             text-align: right;
             margin-top: 15px;
             font-size: 16px;
             font-weight: bold;
         }
-
-        /* =========================
-        BOTÓN
-        ========================= */
 
         .btn-print {
             background: #27ae60;
@@ -147,7 +131,7 @@
         }
 
         /* =========================
-        IMPRESIÓN
+        IMPRESIÓN PRO
         ========================= */
 
         @media print {
@@ -155,6 +139,9 @@
             body {
                 background: white;
                 padding: 0;
+                margin: 0;
+                font-family: Arial, sans-serif;
+                color: #000;
             }
 
             .btn-print {
@@ -163,20 +150,68 @@
 
             .media-carta {
                 width: 100%;
+                margin: 0;
+                padding: 18px 25px;
                 border: none;
                 box-shadow: none;
-                margin: 0;
                 border-radius: 0;
+                page-break-inside: avoid;
             }
 
             .linea-corte {
-                border-top: 2px dashed black;
+                border-top: 2px dashed #000;
             }
 
+            h2 {
+                font-size: 18px;
+                color: #000;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            h3 {
+                font-size: 14px;
+                border-left: 3px solid #000;
+                color: #000;
+            }
+
+            p {
+                font-size: 12px;
+            }
+
+            table {
+                font-size: 11px;
+                margin-top: 8px;
+            }
+
+            th {
+                background: #f2f2f2;
+                color: #000;
+                border: 1px solid #ccc;
+                padding: 6px;
+            }
+
+            td {
+                border: 1px solid #ddd;
+                padding: 6px;
+            }
+
+            tr:hover {
+                background: transparent;
+            }
+
+            table, tr, td, th {
+                page-break-inside: avoid;
+            }
+
+            .total {
+                font-size: 14px;
+                border-top: 2px solid #000;
+                padding-top: 6px;
+            }
         }
 
     </style>
-
 </head>
 
 <body>
@@ -227,25 +262,9 @@
 
         <p><b>🚚 Domiciliario:</b> {{ factura.domiciliario }}</p>
 
-        <p><b>💰 Tarifa aplicada:</b>
-            {% if factura.tipo_precio == "mayorista" %}
-                Mayorista
-            {% elif factura.tipo_precio == "individual" %}
-                Individual
-            {% elif factura.tipo_precio == "mostrador" %}
-                Mostrador
-            {% else %}
-                -
-            {% endif %}
-        </p>
-
-        <p><b>Total factura:</b> ${{ "{:,.0f}".format(factura.total or 0) }}</p>
+        <p><b>Total:</b> ${{ "{:,.0f}".format(factura.total or 0) }}</p>
         <p><b>Abonado:</b> ${{ "{:,.0f}".format(factura.abono or 0) }}</p>
-        <p><b>Saldo pendiente:</b> ${{ "{:,.0f}".format((factura.total or 0) - (factura.abono or 0)) }}</p>
-
-        {% if factura.tipo_venta == "credito" %}
-        <p><b>📅 Fecha límite:</b> {{ factura.plazo_pago or "-" }}</p>
-        {% endif %}
+        <p><b>Saldo:</b> ${{ "{:,.0f}".format((factura.total or 0) - (factura.abono or 0)) }}</p>
 
         <h3>📦 Detalle</h3>
 
@@ -285,7 +304,7 @@
 
         <h3>💳 Información de Pago</h3>
 
-        <p><b>Tipo de venta:</b>
+        <p><b>Tipo:</b>
             {% if factura.tipo_venta == "credito" %}
                 <span class="badge alerta-naranja">💳 Crédito</span>
             {% else %}
@@ -303,13 +322,11 @@
             {% endif %}
         </p>
 
-        <p><b>Total factura:</b> ${{ "{:,.0f}".format(factura.total or 0) }}</p>
+        <p><b>Total:</b> ${{ "{:,.0f}".format(factura.total or 0) }}</p>
         <p><b>Abonado:</b> ${{ "{:,.0f}".format(factura.abono or 0) }}</p>
-        <p><b>Saldo pendiente:</b> ${{ "{:,.0f}".format((factura.total or 0) - (factura.abono or 0)) }}</p>
+        <p><b>Saldo:</b> ${{ "{:,.0f}".format((factura.total or 0) - (factura.abono or 0)) }}</p>
 
-        {% if factura.tipo_venta == "credito" %}
-        <p><b>📅 Fecha límite:</b> {{ factura.plazo_pago or "-" }}</p>
-        {% endif %}
+        <h3>📦 Detalle</h3>
 
         <table>
             <tr>
