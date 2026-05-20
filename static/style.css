@@ -630,3 +630,23 @@
             border: 1px solid #ccc;
             border-radius: 8px;
         }
+        .flash-message {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .flash-message.error {
+            background: #dc3545;
+        }
+
+        .flash-message.success {
+            background: #28a745;
+        }
+
+        .flash-message.info {
+            background: #007bff;
+        }

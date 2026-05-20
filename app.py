@@ -2,7 +2,7 @@ import sqlite3
 import pytz
 import os
 from datetime import datetime
-from flask import Flask, render_template, session, redirect, request
+from flask import Flask, flash, render_template, session, redirect, request
 from db import (
     validar_usuario,
     obtener_empresas,
@@ -173,6 +173,8 @@ def dashboard():
     # =========================
     # RENDER
     # =========================
+    
+
     return render_template(
         "dashboard.html",
         pedidos=pedidos,
@@ -438,27 +440,48 @@ def crear_factura_route():
     # =========================
     # DATOS CLIENTE
     # =========================
-    cliente = request.form["cliente"]
-    direccion = request.form["direccion"]
-    ciudad = request.form["ciudad"]
-    telefono = request.form["telefono"]
+    cliente = request.form.get("cliente", "").strip()
+    direccion = request.form.get("direccion", "").strip()
+    ciudad = request.form.get("ciudad", "").strip()
+    telefono = request.form.get("telefono", "").strip()
 
-    tipo_id = request.form["tipo_id"]
-    identificacion = request.form["identificacion"]
+    tipo_id = request.form.get("tipo_id", "")
+    identificacion = request.form.get("identificacion", "").strip()
 
-    domiciliario = request.form.get("domiciliario", "")
+    domiciliario = request.form.get("domiciliario", "").strip()
 
-    # =========================
-    # TIPOS
-    # =========================
     tipo_precio = request.form.get("tipo_precio", "")
     tipo_venta = request.form.get("tipo_venta", "contado")
 
+    plazo_pago = request.form.get("plazo_pago", "").strip()
+    abono_raw = request.form.get("abono", "").strip()
+
     # =========================
-    # CRÉDITO
+    # VALIDACIONES CLIENTE
     # =========================
-    plazo_pago = request.form.get("plazo_pago", None)
-    abono = float(request.form.get("abono") or 0)
+    if not cliente:
+        flash("⚠️ Debes ingresar el cliente", "error")
+        return redirect("/dashboard")
+
+    if not direccion:
+        flash("⚠️ Debes ingresar la dirección", "error")
+        return redirect("/dashboard")
+
+    if not ciudad:
+        flash("⚠️ Debes ingresar la ciudad", "error")
+        return redirect("/dashboard")
+
+    if not telefono:
+        flash("⚠️ Debes ingresar el teléfono", "error")
+        return redirect("/dashboard")
+
+    if not tipo_id or not identificacion:
+        flash("⚠️ Debes ingresar identificación del cliente", "error")
+        return redirect("/dashboard")
+
+    if not domiciliario:
+        flash("⚠️ Debes asignar un domiciliario", "error")
+        return redirect("/dashboard")
 
     # =========================
     # PRODUCTOS
@@ -467,14 +490,54 @@ def crear_factura_route():
     cantidades = request.form.getlist("cantidad[]")
     pesos = request.form.getlist("peso[]")
 
-    # =========================
-    # VALIDACIÓN BÁSICA
-    # =========================
     if not productos:
-        return "Debe agregar productos", 400
+        flash("⚠️ Debes agregar productos", "error")
+        return redirect("/dashboard")
 
     # =========================
-    # DB
+    # VALIDAR CANTIDAD Y PESO
+    # =========================
+    for i in range(len(productos)):
+
+        try:
+            cantidad = float(cantidades[i])
+            peso = float(pesos[i])
+        except:
+            flash(f"⚠️ Datos inválidos en producto '{productos[i]}'", "error")
+            return redirect("/dashboard")
+
+        if cantidad <= 0:
+            flash(f"⚠️ La cantidad de '{productos[i]}' debe ser mayor a 0", "error")
+            return redirect("/dashboard")
+
+        if peso <= 0:
+            flash(f"⚠️ El peso de '{productos[i]}' debe ser mayor a 0", "error")
+            return redirect("/dashboard")
+
+    # =========================
+    # VALIDACIÓN CRÉDITO
+    # =========================
+    if tipo_venta == "credito":
+
+        if not plazo_pago:
+            flash("⚠️ Debes definir el plazo de pago", "error")
+            return redirect("/dashboard")
+
+        if abono_raw == "":
+            flash("⚠️ Debes ingresar abono para crédito", "error")
+            return redirect("/dashboard")
+
+    # =========================
+    # NORMALIZAR ABONO
+    # =========================
+    try:
+        abono = float(abono_raw or 0)
+    except:
+        flash("⚠️ El abono no es válido", "error")
+        return redirect("/dashboard")
+
+    # =========================
+    # DB PRODUCTOS
     # =========================
     import sqlite3
     conn = sqlite3.connect("pedidos.db")
@@ -486,8 +549,8 @@ def crear_factura_route():
     for i in range(len(productos)):
 
         producto = productos[i]
-        cantidad = int(cantidades[i] or 0)
-        peso = float(pesos[i] or 0)
+        cantidad = float(cantidades[i])
+        peso = float(pesos[i])
 
         cursor.execute("""
             SELECT * FROM productos
@@ -503,10 +566,8 @@ def crear_factura_route():
             precio_unitario = producto_db["precio_mayorista"]
         elif tipo_precio == "individual":
             precio_unitario = producto_db["precio_individual"]
-        elif tipo_precio == "mostrador":
-            precio_unitario = producto_db["precio_mostrador"]
         else:
-            precio_unitario = 0
+            precio_unitario = producto_db["precio_mostrador"]
 
         productos_factura.append({
             "producto": producto,
@@ -518,7 +579,7 @@ def crear_factura_route():
     conn.close()
 
     # =========================
-    # CLIENTE FORMATEADO
+    # CLIENTE FINAL
     # =========================
     if tipo_id == "nit":
         cliente_final = f"{cliente} - NIT: {identificacion}"
@@ -526,7 +587,7 @@ def crear_factura_route():
         cliente_final = f"{cliente} - CC: {identificacion}"
 
     # =========================
-    # CREAR FACTURA (CORRECTO)
+    # CREAR FACTURA
     # =========================
     factura_id = crear_factura(
         cliente=cliente_final,
@@ -542,8 +603,10 @@ def crear_factura_route():
         domiciliario=domiciliario
     )
 
+    # =========================
+    # CREAR PEDIDOS
+    # =========================
     for p in productos_factura:
-
         agregar_pedido(
             cliente=cliente_final,
             producto=p["producto"],
@@ -559,7 +622,9 @@ def crear_factura_route():
             empresa_id=empresa_id
         )
 
-    return redirect(f"/factura/{factura_id}")
+    flash("✅ Factura creada correctamente", "success")
+    return redirect("/dashboard?reload=1")
+   
        
 
 @app.route("/registrar_compra", methods=["POST"])
@@ -794,10 +859,15 @@ def ventas():
             SUM(total - abono) as deben
         FROM facturas
         WHERE empresa_id = ?
-        AND date(fecha) = date('now')
+        AND date(fecha) = date('now', 'localtime')
     """, (empresa_id,))
 
-    dia = dict(cursor.fetchone())
+    dia = cursor.fetchone()
+    dia = dict(dia) if dia else {
+        "facturado": 0,
+        "abonado": 0,
+        "deben": 0
+    }
 
     # ================= RESUMEN MENSUAL =================
     cursor.execute("""
@@ -810,7 +880,12 @@ def ventas():
         AND strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
     """, (empresa_id,))
 
-    mes = dict(cursor.fetchone())
+    mes = cursor.fetchone()
+    mes = dict(mes) if mes else {
+        "facturado": 0,
+        "abonado": 0,
+        "deben": 0
+    }
 
     # ================= HISTÓRICO DIARIO =================
     cursor.execute("""
@@ -1303,6 +1378,57 @@ def historial_abonos(factura_id):
         pagos=pagos,
         factura_id=factura_id
     )
+@app.route("/editar_cliente/<int:id>")
+def editar_cliente(id):
+
+    if "usuario" not in session:
+        return redirect("/")
+
+    conn = conectar()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM clientes
+        WHERE id = ?
+        AND empresa_id = ?
+    """, (id, session["empresa_id"]))
+
+    cliente = cursor.fetchone()
+    conn.close()
+
+    return render_template("editar_cliente.html", cliente=cliente)
+@app.route("/actualizar_cliente/<int:id>", methods=["POST"])
+def actualizar_cliente(id):
+
+    if "usuario" not in session:
+        return redirect("/")
+
+    nombre = request.form.get("nombre")
+    direccion = request.form.get("direccion")
+    ciudad = request.form.get("ciudad")
+    telefono = request.form.get("telefono")
+
+    import sqlite3
+    conn = sqlite3.connect("pedidos.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE clientes
+        SET nombre=?,
+            direccion=?,
+            ciudad=?,
+            telefono=?
+        WHERE id=?
+    """, (nombre, direccion, ciudad, telefono, id))
+
+    conn.commit()
+    conn.close()
+
+    flash("✅ Cliente actualizado correctamente", "success")
+
+    return redirect("/clientes")
 # =========================
 # RUN
 # =========================

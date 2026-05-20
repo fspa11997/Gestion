@@ -28,6 +28,22 @@
     </button>
 </div>
 
+<div id="flash-container" style="margin: 15px 20px;">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+
+                <div class="flash-message {{ category }}">
+                    {{ message }}
+                </div>
+
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+</div>
+
 <br><br>
 <div class="topbar">
 
@@ -502,8 +518,12 @@
                 <td>{{ "%.2f"|format(p.peso or 0) }}</td>
                 <td>{{ "{:,.0f}".format(p.precio) }}</td>
                 <td>
-                    {{ p.fecha[8:10] }}/{{ p.fecha[5:7] }}/{{ p.fecha[0:4] }}
-                    {{ p.fecha[11:16] }}
+                    {% if p.fecha %}
+                        {{ p.fecha[8:10] }}/{{ p.fecha[5:7] }}/{{ p.fecha[0:4] }}
+                    {% else %}
+                        Sin fecha
+                    {% endif %}
+                    {{ (p.fecha or '')[11:16] }}
                 </td>
                 <td>
                     {% if p.fecha_entrega %}
@@ -546,6 +566,16 @@
 
 
 <script>
+
+window.onload = function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("reload") === "1") {
+        setTimeout(() => {
+            window.location.href = "/dashboard";
+        }, 1500);
+    }
+}
+
 function toggleForm() {
     const form = document.getElementById("formUsuario");
     form.style.display = form.style.display === "none" ? "block" : "none";

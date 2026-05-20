@@ -1,4 +1,4 @@
-from db import inicializar_db
+
 import sqlite3
 import bcrypt
 
@@ -7,12 +7,14 @@ import bcrypt
 # RESET (solo desarrollo)
 # =========================
 
-   
+from db import inicializar_db
+
+inicializar_db()
 
 # =========================
 # DB
 # =========================
-inicializar_db()        
+       
 
 conn = sqlite3.connect("pedidos.db")
 cursor = conn.cursor()

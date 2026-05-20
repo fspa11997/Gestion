@@ -1,8 +1,6 @@
 import sqlite3
-import pytz
 import bcrypt
 from datetime import datetime
-from datetime import datetime, timezone, timedelta
 
 DB = "pedidos.db"
 
@@ -218,9 +216,15 @@ def inicializar_db():
     conn.close()
 
 
+from datetime import datetime, timezone, timedelta
+import pytz
+
+def ahora():
+    bogota = timezone(timedelta(hours=-5))
+    return datetime.now(bogota).strftime("%Y-%m-%d %H:%M:%S")
 
 def crear_usuario(usuario, password, rol, empresa_id):
-    import bcrypt
+   
 
     conn = conectar()
     cursor = conn.cursor()
@@ -441,17 +445,41 @@ def agregar_pedido(
     conn = conectar()
     cursor = conn.cursor()
 
+    from datetime import datetime
+    from db import ahora
+    fecha = ahora()
+
     cursor.execute("""
         INSERT INTO pedidos (
-            cliente, producto, direccion, ciudad, telefono,
-            domiciliario, cantidad, peso,
-            precio, abono, tipo_precio, empresa_id
+            cliente,
+            producto,
+            direccion,
+            ciudad,
+            telefono,
+            domiciliario,
+            cantidad,
+            peso,
+            precio,
+            abono,
+            tipo_precio,
+            fecha,
+            empresa_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        cliente, producto, direccion, ciudad, telefono,
-        domiciliario, cantidad, peso,
-        precio, abono, tipo_precio, empresa_id
+        cliente,
+        producto,
+        direccion,
+        ciudad,
+        telefono,
+        domiciliario,
+        cantidad,
+        peso,
+        precio,
+        abono,
+        tipo_precio,
+        fecha,
+        empresa_id
     ))
 
     conn.commit()
@@ -511,9 +539,9 @@ def cambiar_estado(id, estado):
     cursor = conn.cursor()
 
     from datetime import datetime
-
+    from db import ahora
     if estado == "entregado":
-        fecha_entrega = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        fecha_entrega = ahora()
     else:
         fecha_entrega = None
 
@@ -553,6 +581,8 @@ def recuperar_pedido(id):
     conn.commit()
     conn.close()
 
+from db import ahora
+
 def total_ventas_dia(empresa_id):
     conn = conectar()
     cursor = conn.cursor()
@@ -560,7 +590,7 @@ def total_ventas_dia(empresa_id):
     cursor.execute("""
         SELECT SUM(precio) as total
         FROM pedidos
-        WHERE DATE(fecha) = DATE('now')
+        WHERE date(fecha) = date('now', 'localtime')
         AND empresa_id = ?
         AND eliminado = 0
     """, (empresa_id,))
@@ -577,7 +607,7 @@ def total_ventas_mes(empresa_id):
     cursor.execute("""
         SELECT SUM(precio) as total
         FROM pedidos
-        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
+        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
         AND empresa_id = ?
         AND eliminado = 0
     """, (empresa_id,))
@@ -586,6 +616,7 @@ def total_ventas_mes(empresa_id):
     conn.close()
 
     return total or 0
+
 def producto_top_mes(empresa_id):
     conn = conectar()
     cursor = conn.cursor()
@@ -593,7 +624,7 @@ def producto_top_mes(empresa_id):
     cursor.execute("""
         SELECT producto, SUM(cantidad) as total
         FROM pedidos
-        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')
+        WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
         AND empresa_id = ?
         AND eliminado = 0
         GROUP BY producto
@@ -622,17 +653,12 @@ def crear_factura(
 
     import sqlite3
     from datetime import datetime
-    import pytz
-
+    from db import ahora
     conn = sqlite3.connect("pedidos.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # =========================
-    # FECHA CORRECTA (COLOMBIA)
-    # =========================
-    colombia = pytz.timezone("America/Bogota")
-    fecha = (datetime.now(timezone.utc) - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     total = 0
 
@@ -648,6 +674,7 @@ def crear_factura(
     # CALCULAR TOTAL FACTURA
     # =========================
     for p in productos:
+
         precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
 
@@ -662,12 +689,14 @@ def crear_factura(
     # ESTADO
     # =========================
     if tipo_venta == "credito":
+
         if abono <= 0:
             estado = "pendiente"
         elif saldo == 0:
             estado = "pagado"
         else:
             estado = "parcial"
+
     else:
         estado = "pagado"
         abono = total
@@ -715,6 +744,7 @@ def crear_factura(
     # DETALLE FACTURA
     # =========================
     for p in productos:
+
         precio = float(p.get("precio") or 0)
         peso = float(p.get("peso") or 0)
         cantidad = int(p.get("cantidad") or 0)
@@ -739,6 +769,34 @@ def crear_factura(
             precio,
             subtotal
         ))
+
+        # =========================
+        # DESCONTAR INVENTARIO
+        # =========================
+
+        cursor.execute("""
+            SELECT stock_unidades, stock_kilos
+            FROM inventario
+            WHERE producto=? AND empresa_id=?
+        """, (p.get("producto"), empresa_id))
+
+        inv = cursor.fetchone()
+
+        if inv:
+            nuevas_unidades = max(inv["stock_unidades"] - int(p.get("cantidad") or 0), 0)
+            nuevas_kilos = max(inv["stock_kilos"] - float(p.get("peso") or 0), 0)
+
+            cursor.execute("""
+                UPDATE inventario
+                SET stock_unidades=?,
+                    stock_kilos=?
+                WHERE producto=? AND empresa_id=?
+            """, (
+                nuevas_unidades,
+                nuevas_kilos,
+                p.get("producto"),
+                empresa_id
+            ))
 
     # =========================
     # CARTERA (CRÉDITO)
@@ -816,8 +874,8 @@ def registrar_compra(producto, cantidad, peso, empresa_id):
 
     conn = conectar()
     cursor = conn.cursor()
-    colombia = pytz.timezone("America/Bogota")
-    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
+    from db import ahora
+    fecha = ahora()
 
     # 🔍 verificar si existe
     cursor.execute("""
@@ -879,11 +937,12 @@ def obtener_facturas(empresa_id):
 def crear_factura_empresa(empresa_id):
     from datetime import datetime
     import sqlite3
+    from db import ahora
 
     conn = sqlite3.connect("pedidos.db")
     cursor = conn.cursor()
-    colombia = pytz.timezone("America/Bogota")
-    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
+
+    fecha = ahora()
 
     # 🔥 obtener pedidos pendientes
     cursor.execute("""
@@ -1030,9 +1089,8 @@ def crear_credito(cliente, factura_id, total, empresa_id):
 
     conn = conectar()
     cursor = conn.cursor()
-
-    colombia = pytz.timezone("America/Bogota")
-    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
+    from db import ahora
+    fecha = ahora()
 
     cursor.execute("""
         INSERT INTO creditos (
@@ -1179,8 +1237,8 @@ def registrar_abono(factura_id, abono, observacion, empresa_id):
     # =========================
     # HISTORIAL
     # =========================
-    colombia = pytz.timezone("America/Bogota")
-    fecha = datetime.now(colombia).strftime("%Y-%m-%d %H:%M:%S")
+    from db import ahora
+    fecha = ahora()
 
     cursor.execute("""
         INSERT INTO pagos_credito (

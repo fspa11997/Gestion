@@ -132,7 +132,16 @@
             <td>{{ c.telefono }}</td>
 
             <td>{{ c.identificacion }}</td>
+            
+            <td>
 
+                <a href="/editar_cliente/{{ c.id }}">
+                    <button class="btn-blue">
+                        ✏️ Editar
+                    </button>
+                </a>
+
+            </td>
         </tr>
         {% endfor %}
 
