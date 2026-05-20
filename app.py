@@ -35,10 +35,32 @@ from db import (
 
 
 from db import inicializar_db
+def seed():
+    conn = sqlite3.connect("pedidos.db")
+    cursor = conn.cursor()
 
-from db import inicializar_db
+    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    if cursor.fetchone()[0] == 0:
 
+        import bcrypt
+
+        hash_password = bcrypt.hashpw(
+            "1234".encode(),
+            bcrypt.gensalt()
+        )
+
+        cursor.execute("""
+            INSERT INTO usuarios (usuario, password, rol, empresa_id)
+            VALUES (?, ?, ?, ?)
+        """, ("superadmin", hash_password, "owner_global", 1))
+
+        print("🔥 Usuario superadmin creado")
+
+    conn.commit()
+    conn.close()
+    
 inicializar_db()
+seed()
 print("🔥 DB inicializada")
 
 app = Flask(__name__)
@@ -1429,6 +1451,7 @@ def actualizar_cliente(id):
     flash("✅ Cliente actualizado correctamente", "success")
 
     return redirect("/clientes")
+
 # =========================
 # RUN
 # =========================
